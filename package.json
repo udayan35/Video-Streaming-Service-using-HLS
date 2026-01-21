@@ -1,0 +1,19 @@
+{
+  "name": "video-streaming-service",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "dot-env": "^0.0.1",
+    "express": "^5.2.1",
+    "fluent-ffmpeg": "^2.1.3",
+    "mime": "^4.1.0",
+    "multer": "^2.0.2"
+  }
+}

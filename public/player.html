@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HLS Player</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+
+<h2>HLS Video Player</h2>
+
+<video id="video" width="720" controls></video>
+
+<script>
+    const url = new URLSearchParams(window.location.search);
+    const master = url.get("src");
+
+    const video = document.getElementById("video");
+
+    if (Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(master);
+        hls.attachMedia(video);
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = master;
+    }
+</script>
+
+</body>
+</html>
