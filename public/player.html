@@ -1,28 +1,241 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>HLS Player</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HLS Video Player</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+   
 </head>
 <body>
 
-<h2>HLS Video Player</h2>
+<div class="container">
+    <h2>HLS Video Player</h2>
 
-<video id="video" width="720" controls></video>
+    <div id="error-message" class="error" style="display: none;"></div>
+    <div id="info" class="info" style="display: none;"></div>
+
+    <div class="video-wrapper">
+        <video id="video" controls></video>
+        
+        <div class="controls-overlay">
+            <button class="quality-button" id="quality-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 3v18m0-18l-7 7m7-7l7 7"/>
+                    <rect x="3" y="11" width="18" height="10" rx="2"/>
+                </svg>
+                <span id="current-quality">Auto</span>
+            </button>
+            
+            <div class="quality-menu" id="quality-menu">
+                <!-- Quality options will be added here dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
-    const url = new URLSearchParams(window.location.search);
-    const master = url.get("src");
-
+    const urlParams = new URLSearchParams(window.location.search);
+    const masterUrl = urlParams.get("src");
+    
     const video = document.getElementById("video");
+    const errorDiv = document.getElementById("error-message");
+    const infoDiv = document.getElementById("info");
+    const qualityBtn = document.getElementById("quality-btn");
+    const qualityMenu = document.getElementById("quality-menu");
+    const currentQualitySpan = document.getElementById("current-quality");
 
-    if (Hls.isSupported()) {
-        const hls = new Hls();
-        hls.loadSource(master);
-        hls.attachMedia(video);
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = master;
+    let hls;
+
+    // Toggle quality menu
+    qualityBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        qualityMenu.classList.toggle("show");
+    });
+
+    // Close menu when clicking outside
+    document.addEventListener("click", () => {
+        qualityMenu.classList.remove("show");
+    });
+
+    qualityMenu.addEventListener("click", (e) => {
+        e.stopPropagation();
+    });
+
+    function updateQualityMenu(levels) {
+        qualityMenu.innerHTML = "";
+
+        // Add Auto option
+        const autoOption = document.createElement("div");
+        autoOption.className = "quality-option active";
+        autoOption.innerHTML = `
+            <span>Auto</span>
+            <span class="checkmark">✓</span>
+        `;
+        autoOption.addEventListener("click", () => {
+            hls.currentLevel = -1; // Enable auto quality
+            updateActiveQuality(-1);
+        });
+        qualityMenu.appendChild(autoOption);
+
+        // Add quality levels
+        levels.forEach((level, index) => {
+            const option = document.createElement("div");
+            option.className = "quality-option";
+            
+            const height = level.height;
+            const qualityLabel = height >= 2160 ? "4K" :
+                                height >= 1440 ? "2K" :
+                                height >= 1080 ? "1080p" :
+                                height >= 720 ? "720p" :
+                                height >= 480 ? "480p" :
+                                height >= 360 ? "360p" : `${height}p`;
+            
+            option.innerHTML = `
+                <span>${qualityLabel}</span>
+                <span class="checkmark" style="display: none;">✓</span>
+            `;
+            
+            option.addEventListener("click", () => {
+                hls.currentLevel = index;
+                updateActiveQuality(index);
+            });
+            
+            qualityMenu.appendChild(option);
+        });
     }
+
+    function updateActiveQuality(levelIndex) {
+        const options = qualityMenu.querySelectorAll(".quality-option");
+        
+        options.forEach((option, index) => {
+            const checkmark = option.querySelector(".checkmark");
+            if (index === levelIndex + 1) { // +1 because of Auto option
+                option.classList.add("active");
+                checkmark.style.display = "inline";
+                
+                // Update button text
+                const qualityText = option.querySelector("span").textContent;
+                currentQualitySpan.textContent = qualityText;
+            } else {
+                option.classList.remove("active");
+                checkmark.style.display = "none";
+            }
+        });
+
+        // Handle Auto option
+        if (levelIndex === -1) {
+            options[0].classList.add("active");
+            options[0].querySelector(".checkmark").style.display = "inline";
+            currentQualitySpan.textContent = "Auto";
+        } else {
+            options[0].classList.remove("active");
+            options[0].querySelector(".checkmark").style.display = "none";
+        }
+
+        qualityMenu.classList.remove("show");
+    }
+
+    if (!masterUrl) {
+        errorDiv.textContent = "Error: No video source provided. Add ?src=YOUR_VIDEO_URL to the URL";
+        errorDiv.style.display = "block";
+    } else {
+        infoDiv.textContent = `Loading: ${masterUrl}`;
+        infoDiv.style.display = "block";
+
+        if (Hls.isSupported()) {
+            hls = new Hls({
+                debug: false,
+                enableWorker: true,
+            });
+
+            hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+                console.log("Manifest loaded, found " + hls.levels.length + " quality levels");
+                infoDiv.style.display = "none";
+                
+                // Populate quality menu
+                updateQualityMenu(hls.levels);
+                
+                video.play().catch(e => console.log("Autoplay prevented:", e));
+            });
+
+            hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+                console.log("Quality switched to level:", data.level);
+                const currentLevel = hls.currentLevel;
+                
+                if (currentLevel === -1) {
+                    // Auto mode
+                    const autoLevel = hls.levels[data.level];
+                    console.log(`Auto selected: ${autoLevel.height}p`);
+                }
+            });
+
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                console.error("HLS Error:", data);
+                
+                if (data.fatal) {
+                    switch(data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            errorDiv.textContent = "Network error: Cannot load video. Check the URL and server.";
+                            hls.startLoad();
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            errorDiv.textContent = "Media error: Cannot decode video.";
+                            hls.recoverMediaError();
+                            break;
+                        default:
+                            errorDiv.textContent = `Fatal error: ${data.type}`;
+                            hls.destroy();
+                            break;
+                    }
+                    errorDiv.style.display = "block";
+                }
+            });
+
+            hls.loadSource(masterUrl);
+            hls.attachMedia(video);
+
+            window.hls = hls;
+
+        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+            video.src = masterUrl;
+            
+            video.addEventListener("loadedmetadata", () => {
+                console.log("Video loaded (native HLS - Safari)");
+                infoDiv.style.display = "none";
+                // Note: Safari handles quality selection natively
+                qualityBtn.style.display = "none";
+            });
+
+            video.addEventListener("error", (e) => {
+                errorDiv.textContent = `Video error: ${video.error.message}`;
+                errorDiv.style.display = "block";
+            });
+
+        } else {
+            errorDiv.textContent = "Error: Your browser doesn't support HLS video playback.";
+            errorDiv.style.display = "block";
+        }
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener("keydown", (e) => {
+        switch(e.key) {
+            case " ":
+                e.preventDefault();
+                video.paused ? video.play() : video.pause();
+                break;
+            case "ArrowRight":
+                video.currentTime += 10;
+                break;
+            case "ArrowLeft":
+                video.currentTime -= 10;
+                break;
+            case "m":
+                video.muted = !video.muted;
+                break;
+        }
+    });
 </script>
 
 </body>

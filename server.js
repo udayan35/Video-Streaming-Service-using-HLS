@@ -3,8 +3,8 @@ import dotenv from "dotenv";
 import routes from "./src/routes/index.js";
 import mime from "mime";
 
-mime.define({ "application/vnd.apple.mpegurl": ["m3u8"] }, { force: true });
-mime.define({ "video/mp2t": ["ts"] }, { force: true });
+//mime.define({ "application/vnd.apple.mpegurl": ["m3u8"] }, { force: true });
+//mime.define({ "video/mp2t": ["ts"] }, { force: true });
 
 
 dotenv.config();

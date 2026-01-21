@@ -1,8 +1,9 @@
 import ffmpeg from "fluent-ffmpeg";
 import fs from "fs";
+import ffmpegPath from "@ffmpeg-installer/ffmpeg";
 import path from "path";
 
-ffmpeg.setFfmpegPath("/usr/bin/ffmpeg");
+ffmpeg.setFfmpegPath(ffmpegPath.path);
 
 export default {
   generateHLS(inputFile, videoId) {
